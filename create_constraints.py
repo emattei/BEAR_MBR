@@ -4,11 +4,41 @@ from Bio import AlignIO
 import urllib
 import requests
 import sys
+import os
+import errno
+import gzip
+import pathlib
 
-#Input: Rfam accession
+
 def eprint(*args, **kwargs):
 	# http://stackoverflow.com/questions/5574702/
 	print(*args, file=sys.stderr, **kwargs)
+
+
+def download_seed(rfam_version, outdir, force=False):
+	outfile = os.path.join(outdir,"Rfam.seed.gz")
+	if os.path.isfile(outfile) and not force:
+		print("Rfam.seed.gz already present.\nUse force option if you want to download it again!\n")
+		return
+	else:
+		url = "ftp://ftp.ebi.ac.uk/pub/databases/Rfam/%s.0/Rfam.seed.gz" %(rfam_version)
+		output = open(outfile, "wb")
+		try:
+			response = urllib.request.urlopen(url)
+			output.write(response.read())
+		except:
+			output.close()
+			raise
+	
+def get_families_acc(rfam_dir):
+	acc = []
+	seed = os.path.join(rfam_dir,"Rfam.seed.gz")
+	with gzip.open(seed, "rt", encoding="ISO-8859-1") as fh:
+		for line in fh:
+			if line[0:7] == "#=GF AC":
+				rf_acc = line.strip().split(None)[2]
+				acc.append(rf_acc)
+	return acc
 
 
 def create_url(rfam_acc):
@@ -29,7 +59,7 @@ def retrieve_alignment(rfam_acc,out="ali_tmp"):
 
 	return out
 
-def crea_constraint(rfam_acc, ali_stock):
+def create_constraint(rfam_acc, ali_stock, outdir):
 	
 	IUPAC=["R","Y","M","K","S","W","B","D","H","V","N"]
 	CONSTRAINTS=[">","<","_"]
@@ -43,8 +73,9 @@ def crea_constraint(rfam_acc, ali_stock):
 		eprint("No constraints possible for %s!" %(rfam_acc))
 		return False
 
-	
-	out_fasta=open("./constraints/"+rfam_acc+".constraints","w")
+	outfile = os.path.join(outdir,"constraints",rfam_acc+".constraints")
+#	pathlib.Path(outfile).mkdir(parents=True, exist_ok=True) 
+	out_fasta=open(outfile,"w")
 
 	
 	brackets = [idx for idx, ss in enumerate(SS) if ss in CONSTRAINTS[0:2] ]
@@ -69,22 +100,41 @@ def crea_constraint(rfam_acc, ali_stock):
 
 
 
-acc = []
-with open("accession.rfam5","r") as f:
-	for line in f:
-		acc.append(line.strip())
+	
+
+#Input the Rfam version you want to use
+rfam_version = sys.argv[1]
+rfam_dir = "Rfam_"+str(rfam_version)
+
+try:
+    os.makedirs(rfam_dir)
+    os.makedirs(rfam_dir+"/constraints")
+except OSError as e:
+    if e.errno != errno.EEXIST:
+        raise
+
+download_seed(rfam_version,rfam_dir)
+
+acc = get_families_acc(rfam_dir)
+
+seed = os.path.join(rfam_dir,"Rfam.seed.gz")
+
+count = 0
+
+with gzip.open(seed, "rt", encoding="ISO-8859-1") as handle:
+	for record in AlignIO.parse(handle, "stockholm"):
+		rfam_acc = acc[count]
+		create_constraint(rfam_acc, record, rfam_dir)
+		count += 1
+
+
+#ali_fh = open(seed, encoding = "ISO-8859-1")	
+#alis = AlignIO.parse(ali_fh, "stockholm")
+#Old verion one file at the time
+#acc = []
 #for i in range(1,177):
 #	rfam_acc = "RF" + str(i).zfill(5)
 #	ali_fnp = retrieve_alignment(rfam_acc)
 #	ali_fh = open(ali_fnp, encoding = "ISO-8859-1")
 #	ali = AlignIO.read(ali_fh, "stockholm")
 #	crea_constraint(rfam_acc, ali)	
-ali_fh = open("Rfam.seed", encoding = "ISO-8859-1")	
-alis = AlignIO.parse(ali_fh, "stockholm")
-
-count = 0
-
-for ali in alis:
-	rfam_acc = acc[count]
-	crea_constraint(rfam_acc, ali)	
-	count += 1
