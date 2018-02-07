@@ -30,7 +30,6 @@ def retrieve_alignment(rfam_acc,out="ali_tmp"):
 	return out
 
 def crea_constraint(rfam_acc, ali_stock):
-	out_fasta=open("./constraints/"+rfam_acc+".constraints","w")
 	
 	IUPAC=["R","Y","M","K","S","W","B","D","H","V","N"]
 	CONSTRAINTS=[">","<","_"]
@@ -43,6 +42,9 @@ def crea_constraint(rfam_acc, ali_stock):
 	except:
 		eprint("No constraints possible for %s!" %(rfam_acc))
 		return False
+
+	
+	out_fasta=open("./constraints/"+rfam_acc+".constraints","w")
 
 	
 	brackets = [idx for idx, ss in enumerate(SS) if ss in CONSTRAINTS[0:2] ]
