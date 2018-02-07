@@ -8,6 +8,7 @@ import os
 import errno
 import gzip
 import pathlib
+import re
 
 
 def eprint(*args, **kwargs):
@@ -60,6 +61,8 @@ def retrieve_alignment(rfam_acc,out="ali_tmp"):
 	return out
 
 def create_constraint(rfam_acc, ali_stock, outdir):
+	#p = re.compile('>+?(?=[\.x])') #need to remove the closing parenthesis from beginning of the string
+	p = re.compile('.+?(?=<)')
 	
 	IUPAC=["R","Y","M","K","S","W","B","D","H","V","N"]
 	CONSTRAINTS=[">","<","_"]
@@ -94,7 +97,14 @@ def create_constraint(rfam_acc, ali_stock, outdir):
 		gaps = [idx for idx, nuc in enumerate(record.seq) if nuc == "-"]
 
 		out_fasta.write(str(record.seq).replace("-","") + "\n")
-		out_fasta.write("".join([ss_con for idx, ss_con in enumerate(ss_cons) if not idx in gaps]) + "\n")
+		
+		final = "".join([ss_con for idx, ss_con in enumerate(ss_cons) if not idx in gaps])
+		m = p.match(final)
+		
+		if m:
+			final = final[m.span()[0]:m.span()[1]].replace(">",".")  + final[m.span()[1]:]
+		else:
+			out_fasta.write( final + "\n")
 		
 	out_fasta.close()
 
